@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+rss_checker
 
 # Test binary, built with `go test -c`
 *.test
