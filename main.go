@@ -109,7 +109,6 @@ func cacheFeed(cacheDir string, feed Feed) error {
 }
 
 func main() {
-	log.Println("starting...")
 	feedConfs, err := WalkAllFilesInConfDir("conf/")
 	if err != nil {
 		log.Fatal("failed to fetch feeds")
@@ -118,13 +117,13 @@ func main() {
 	for feedName, feedUrl := range feedConfs {
 		req, err := url.Parse(feedUrl.String())
 		if err != nil {
-			log.Printf("failed to fetch feed: %s", feedName)
+			log.Fatalf("failed to fetch feed: %s", feedName)
 			continue
 		}
 
 		rawFeed, err := fetchFeed(req)
 		if err != nil {
-			fmt.Printf("failed to unmarshal feed: %s", feedName)
+			log.Fatalf("failed to unmarshal feed: %s", feedName)
 			continue
 		}
 
@@ -140,8 +139,7 @@ func main() {
 				return cacheditem.Link == upstreamItem.Link
 			})
 			if err != nil {
-				fmt.Printf("failed to compare new feed to cache: %s", feedName)
-				continue
+				log.Fatalf("failed to compare new feed to cache: %s", feedName)
 			}
 		} else if err == nil && stat.IsDir() {
 			fmt.Printf("cache is dir: %s", feedName)
@@ -154,8 +152,7 @@ func main() {
 
 		err = cacheFeed(cacheDir, feed)
 		if err != nil {
-			fmt.Printf("failed to cache: %s", feedName)
-			continue
+			log.Fatalf("failed to cache: %s", feedName)
 		}
 
 		for _, i := range newItems {
