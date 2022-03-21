@@ -156,7 +156,7 @@ func main() {
 		}
 
 		for _, i := range newItems {
-			fmt.Printf("title: %s\nlink: %s\ndescription: %s\n\n", i.Title, i.Link, i.Description)
+			fmt.Print(i.Link)
 		}
 	}
 
