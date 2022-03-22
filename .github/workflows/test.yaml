@@ -3,7 +3,6 @@ on: [pull_request]
 
 jobs:
   unittest:
-    if: github.event_name == 'pull_request'
     name: Code Quality (gofmt, gotest)
     runs-on: ubuntu-latest
     steps:
@@ -13,12 +12,13 @@ jobs:
         uses: actions/setup-go@v1
         with:
           go-version: 1.18.x
+      - name: Fmt check
+        run: 'test -z $(gofmt -l .)'
       - name: Test 
         run: go test ./...
 
-  docker build:
-    if: github.event_name == 'pull_request'
-    name: Code Quality (gofmt, gotest)
+  docker_build:
+    name: Docker Build Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
