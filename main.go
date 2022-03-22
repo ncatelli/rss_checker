@@ -3,19 +3,27 @@ package main
 import (
 	"encoding/xml"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"text/template"
 
 	"github.com/gorilla/feeds"
 )
 
 const (
-	cacheDir            string = ".rss_checker/cache/"
-	cachedFeedFmtString string = "%s%s.xml"
+	cachedFeedFmtString     string = "%s%s.xml"
+	defaultOutputFormatting string = "{{ .Link }}"
+)
+
+var (
+	confPath     string
+	cachePath    string
+	formatOutput string
 )
 
 func getEnvOr(key, defaultVal string) string {
@@ -108,8 +116,25 @@ func cacheFeed(cacheDir string, feed Feed) error {
 	return nil
 }
 
+func printHelp() {
+	fmt.Println("Usage: rss_checker [OPTIONS]...")
+	fmt.Printf("A cli RSS feed checker.\n\n")
+	flag.PrintDefaults()
+}
+
 func main() {
-	feedConfs, err := WalkAllFilesInConfDir("conf/")
+	help := flag.Bool("help", false, "print help information")
+	flag.StringVar(&confPath, "conf-path", "conf/", "the directory path to source conf files")
+	flag.StringVar(&cachePath, "cache-path", ".rss_checker/cache/", "the directory path to store all cache files")
+	flag.StringVar(&formatOutput, "format", defaultOutputFormatting, "a formatting string for the resulting output data")
+	flag.Parse()
+
+	if *help {
+		printHelp()
+		os.Exit(0)
+	}
+
+	feedConfs, err := WalkAllFilesInConfDir(confPath)
 	if err != nil {
 		log.Fatal("failed to fetch feeds")
 	}
@@ -133,9 +158,9 @@ func main() {
 		}
 
 		var newItems []*feeds.RssItem
-		cacheFile := fmt.Sprintf(cachedFeedFmtString, cacheDir, feed.name)
+		cacheFile := fmt.Sprintf(cachedFeedFmtString, cachePath, feed.name)
 		if stat, err := os.Stat(cacheFile); !errors.Is(err, os.ErrNotExist) {
-			newItems, err = compareCache(cacheDir, feed, func(cacheditem, upstreamItem *feeds.RssItem) bool {
+			newItems, err = compareCache(cachePath, feed, func(cacheditem, upstreamItem *feeds.RssItem) bool {
 				return cacheditem.Link == upstreamItem.Link
 			})
 			if err != nil {
@@ -144,19 +169,24 @@ func main() {
 		} else if err == nil && stat.IsDir() {
 			fmt.Printf("cache is dir: %s", feedName)
 			continue
-		} else {
-			for _, item := range feed.data.Channel.Items {
-				newItems = append(newItems, item)
-			}
 		}
 
-		err = cacheFeed(cacheDir, feed)
+		err = cacheFeed(cachePath, feed)
 		if err != nil {
 			log.Fatalf("failed to cache: %s", feedName)
 		}
 
-		for _, i := range newItems {
-			fmt.Print(i.Link)
+		// setup template
+		outputTemplate, err := template.New("output").Parse(formatOutput)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, item := range newItems {
+			err = outputTemplate.Execute(os.Stdout, item)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
