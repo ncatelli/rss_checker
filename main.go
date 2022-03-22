@@ -124,9 +124,9 @@ func printHelp() {
 
 func main() {
 	help := flag.Bool("help", false, "print help information")
-	flag.StringVar(&confPath, "conf-path", "conf/", "the directory path to source conf files")
-	flag.StringVar(&cachePath, "cache-path", ".rss_checker/cache/", "the directory path to store all cache files")
-	flag.StringVar(&formatOutput, "format", defaultOutputFormatting, "a formatting string for the resulting output data")
+	flag.StringVar(&confPath, "conf-path", getEnvOr("RSS_CHECKER_CONF_PATH", "conf/"), "the directory path to source conf files")
+	flag.StringVar(&cachePath, "cache-path", getEnvOr("RSS_CHECKER_CACHE_PATH", ".rss_checker/cache/"), "the directory path to store all cache files")
+	flag.StringVar(&formatOutput, "format", getEnvOr("RSS_CHECKER_OUTPUT_FORMAT", defaultOutputFormatting), "a formatting string for the resulting output data")
 	flag.Parse()
 
 	if *help {
