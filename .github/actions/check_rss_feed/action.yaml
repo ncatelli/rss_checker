@@ -3,15 +3,15 @@ description: 'Checks a feed against a cache'
 inputs:
   format_output:
     description: 'An option output formatter for resulting new rss items'
-    required: true
+    required: false
     default: '{{ .Link }}'
   conf_dir:
     description: 'the directory path to source conf files'
-    required: true
+    required: false 
     default: 'conf/'
   cache_dir:
     description: 'the directory path to store all cache files'
-    required: true
+    required: false
     default: '.rss_checker/cache/'
 outputs:
   new_items: # id of output
