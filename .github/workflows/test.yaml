@@ -12,7 +12,7 @@ jobs:
         uses: actions/setup-go@v1
         with:
           go-version: 1.18.x
-      - name: Fmt check
+      - name: Format check
         run: 'test -z $(gofmt -l .)'
       - name: Test 
         run: go test ./...
