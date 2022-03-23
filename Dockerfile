@@ -24,8 +24,12 @@ RUN addgroup ${SERVICE_USER} \
 
 COPY --from=builder /${APP_NAME} /opt/${APP_NAME}/bin/${APP_NAME}
 
-RUN chown -R ${SERVICE_USER}:${SERVICE_USER} /opt/${APP_NAME}/bin/${APP_NAME} \
+RUN mkdir -p /opt/${APP_NAME}/.${APP_NAME}/cache \
+    && chown ${SERVICE_USER}:${SERVICE_USER}  /opt/${APP_NAME}/.${APP_NAME}/cache \
+    && chown ${SERVICE_USER}:${SERVICE_USER} /opt/${APP_NAME}/bin/${APP_NAME} \
     && chmod +x /opt/${APP_NAME}/bin/${APP_NAME}
+
+VOLUME /opt/${APP_NAME}/.${APP_NAME}/cache
 
 WORKDIR "/opt/${APP_NAME}/"
 USER ${SERVICE_USER}
