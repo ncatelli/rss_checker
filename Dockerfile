@@ -4,13 +4,14 @@ FROM $BUILDIMG as builder
 
 ARG APP_NAME="rss_checker"
 ENV GOPATH=""
+ENV CGO_ENABLED=0 
 
 RUN apk --no-cache add git
 
 COPY . /go/
 
 RUN cd /go \
-	&& go build -o /${APP_NAME}
+	&& CGO_ENABLED=0 go build -o /${APP_NAME}
 
 FROM $BASEIMG
 LABEL maintainer="Nate Catelli <ncatelli@packetfire.org>"
