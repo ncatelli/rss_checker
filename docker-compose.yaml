@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  web:
+    image: nginx
+    volumes:
+      - ./dev/nginx/www:/usr/share/nginx/html:ro
+    ports:
+      - 8080:80
+    healthcheck:
+      test: 'CMD curl --fail http://localhost/sample-feed.xml || exit 1' 
+      interval: 10s
+      retries: 3
+  checker:
+    build: .
+    command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    volumes:
+      - ./dev/conf:/opt/rss_checker/conf:ro
+      - cache:/opt/rss_checker/.rss_checker/cache
+    environment:
+      - 'RSS_CHECKER_CONF_PATH=/opt/rss_checker/conf/'
+      - 'RSS_CHECKER_CACHE_PATH=/opt/rss_checker/.rss_checker/cache/'
+    depends_on:
+      web:
+        condition: service_started
+volumes:
+  cache:
