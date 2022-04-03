@@ -1,0 +1,64 @@
+name: Check the feed for changes 
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "0 15 * * *"
+
+jobs:
+  get_dates:
+    name: Fetch dates
+    runs-on: ubuntu-latest
+    outputs:
+      todays_date: ${{ steps.todays_date.outputs.date }}
+      yesterdays_date: ${{ steps.yesterdays_date.outputs.date }}
+    steps:
+      - name: Get Todays Date
+        id: todays_date
+        run: echo "::set-output name=date::$(date '+%Y-%m-%d')" 
+      - name: Get Yesterdays Date
+        id: yesterdays_date
+        run: echo "::set-output name=date::$(date -d '1 day ago' '+%Y-%m-%d')" 
+  check_feed:
+    name: Run feed check 
+    runs-on: ubuntu-latest
+    needs: get_dates
+    outputs:
+      feed_output: ${{ steps.feed_check.outputs.new }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: main
+      - name: Create Cache Dir If Not Existing
+        run: mkdir -p .rss_checker/cache
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ./.rss_checker/cache
+          key: rss-feed-check-cache-${{ needs.get_dates.outputs.todays_date }}
+          restore-keys: |
+            rss-feed-check-cache-${{ needs.get_dates.outputs.yesterdays_date }}
+            rss-feed-check-cache
+      - name: Fix Cache Dir Permissions 
+        run: chmod -R 777 .rss_checker/cache
+      - name: Run Feed Check
+        id: feed_check
+        run: echo "::set-output name=new::$(docker run --rm -v $PWD/.rss_checker/cache:/workdir/.rss_checker/cache -v $PWD/conf:/workdir/conf ghcr.io/ncatelli/rss_checker:0.1.0-pre -cache-path /workdir/.rss_checker/cache/ -conf-path /workdir/conf/)" 
+  notify:
+    name: Notify of new publications
+    runs-on: ubuntu-latest
+    needs: check_feed
+    if: ${{ github.event_name != 'pull_request' && contains(needs.check_feed.outputs.feed_output, 'http') }}
+    steps:
+      - run: echo ${{ needs.check_feed.outputs.feed_output }} 
+      - name: Post to discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@0.3.2
+        with:
+          args: ${{ needs.check_feed.outputs.feed_output }}
