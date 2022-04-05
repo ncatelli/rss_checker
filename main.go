@@ -1,23 +1,20 @@
 package main
 
 import (
-	"encoding/xml"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"text/template"
 
-	"github.com/gorilla/feeds"
+	"github.com/SlyMarbo/rss"
 )
 
 const (
-	cachedFeedFmtString     string = "%s/%s.xml"
 	defaultOutputFormatting string = "{{ .Link }}\n"
 )
 
@@ -45,72 +42,34 @@ func (e *ErrInvalidFeedResponse) Error() string {
 	return fmt.Sprintf("received invalid responce code (%d) from feed", e.respCode)
 }
 
-func fetchFeed(req *url.URL) (*feeds.RssFeedXml, error) {
-	feed := &feeds.RssFeedXml{}
+func loadCachedFeed(feedPath string) (*rss.Feed, error) {
+	cachedFeed := &rss.Feed{}
 
-	res, err := http.Get(req.String())
-	if err != nil {
-		log.Print(err)
-		return nil, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if res.StatusCode > 299 {
-		return nil, &ErrInvalidFeedResponse{feed: req.String(), respCode: res.StatusCode}
-	}
-
-	if err = xml.Unmarshal(body, feed); err != nil {
-		return nil, err
-	}
-
-	return feed, nil
-}
-
-type Feed struct {
-	name string
-	data *feeds.RssFeedXml
-}
-
-func compareCache(cacheDir string, feed Feed, comparator func(cacheditem, upstreamItem *feeds.RssItem) bool) ([]*feeds.RssItem, error) {
-	items := make([]*feeds.RssItem, 0, 10)
-	cachedFeed := &feeds.RssFeedXml{}
-
-	fileName := fmt.Sprintf(cachedFeedFmtString, cacheDir, feed.name)
-	data, err := os.ReadFile(fileName)
+	cachedFileData, err := os.ReadFile(feedPath)
 	if err != nil {
 		return nil, err
 	}
 
-	err = xml.Unmarshal(data, cachedFeed)
-	if err != nil {
+	if err := json.Unmarshal(cachedFileData, cachedFeed); err != nil {
 		return nil, err
 	}
 
-	for _, upstreamItem := range feed.data.Channel.Items {
-		found := false
-		for _, cachedItem := range cachedFeed.Channel.Items {
-			if comparator(cachedItem, upstreamItem) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			items = append(items, upstreamItem)
-		}
-	}
-
-	return items, nil
+	return cachedFeed, nil
 }
 
-func cacheFeed(cacheDir string, feed Feed) error {
-	fileName := fmt.Sprintf(cachedFeedFmtString, cacheDir, feed.name)
-	data, err := xml.Marshal(feed.data)
+func cacheFeed(cachePath string, feed *rss.Feed) error {
+	// mark all items as read prior to caching
+	for _, item := range feed.Items {
+		item.Read = true
+	}
+	feed.Unread = 0
+
+	data, err := json.Marshal(feed)
 	if err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(fileName, data, 0644); err != nil {
+	if err := os.WriteFile(cachePath, data, 0644); err != nil {
 		return err
 	}
 
@@ -143,39 +102,35 @@ func main() {
 	for feedName, feedUrl := range feedConfs {
 		req, err := url.Parse(feedUrl.String())
 		if err != nil {
-			log.Fatalf("failed to fetch feed: %s", feedName)
-			continue
+			log.Fatal(err)
 		}
 
-		rawFeed, err := fetchFeed(req)
-		if err != nil {
-			log.Fatalf("failed to unmarshal feed: %s", feedName)
-			continue
-		}
+		var newItems []*rss.Item
 
-		feed := Feed{
-			name: feedName,
-			data: rawFeed,
-		}
-
-		var newItems []*feeds.RssItem
-
-		feedFile := fmt.Sprintf("%s.xml", feed.name)
+		feedFile := fmt.Sprintf("%s.json", feedName)
 		cacheFile := filepath.Join(cachePath, feedFile)
-		if stat, err := os.Stat(cacheFile); !errors.Is(err, os.ErrNotExist) {
-			newItems, err = compareCache(cachePath, feed, func(cacheditem, upstreamItem *feeds.RssItem) bool {
-				return cacheditem.Link == upstreamItem.Link
-			})
+		feed, err := loadCachedFeed(cacheFile)
+		if !errors.Is(err, os.ErrNotExist) {
+			err := feed.Update()
 			if err != nil {
-				log.Fatalf("failed to compare new feed to cache: %s", feedName)
+				log.Fatal(err)
 			}
-		} else if err == nil && stat.IsDir() {
-			fmt.Printf("cache is dir: %s\n", feedName)
-			continue
+			for _, item := range feed.Items {
+				if item.Read == false {
+					newItems = append(newItems, item)
+				}
+			}
+		} else {
+			upstream, err := rss.Fetch(req.String())
+			if err != nil {
+				log.Fatalf("invalid upstream url for %s: %s\n", feedName, req.String())
+			}
+
+			feed = upstream
+			// no new items are append on a new url.
 		}
 
-		err = cacheFeed(cachePath, feed)
-		if err != nil {
+		if cacheFeed(cacheFile, feed) != nil {
 			log.Fatalf("failed to cache: %s\n", feedName)
 		}
 
