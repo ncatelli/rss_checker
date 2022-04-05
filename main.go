@@ -57,20 +57,19 @@ func loadCachedFeed(feedPath string) (*rss.Feed, error) {
 	return cachedFeed, nil
 }
 
-func cacheFeed(cacheDir, name string, feed *rss.Feed) error {
+func cacheFeed(cachePath string, feed *rss.Feed) error {
 	// mark all items as read prior to caching
 	for _, item := range feed.Items {
 		item.Read = true
 	}
 	feed.Unread = 0
 
-	fileName := filepath.Join(cacheDir, name)
 	data, err := json.Marshal(feed)
 	if err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(fileName, data, 0644); err != nil {
+	if err := os.WriteFile(cachePath, data, 0644); err != nil {
 		return err
 	}
 
@@ -112,6 +111,10 @@ func main() {
 		cacheFile := filepath.Join(cachePath, feedFile)
 		feed, err := loadCachedFeed(cacheFile)
 		if !errors.Is(err, os.ErrNotExist) {
+			err := feed.Update()
+			if err != nil {
+				log.Fatal(err)
+			}
 			for _, item := range feed.Items {
 				if item.Read == false {
 					newItems = append(newItems, item)
@@ -127,7 +130,7 @@ func main() {
 			// no new items are append on a new url.
 		}
 
-		if cacheFeed(cachePath, feedName, feed) != nil {
+		if cacheFeed(cacheFile, feed) != nil {
 			log.Fatalf("failed to cache: %s\n", feedName)
 		}
 
