@@ -1,5 +1,5 @@
-ARG BASEIMG="alpine:3.15"
-ARG BUILDIMG="golang:1.20-alpine3.15"
+ARG BASEIMG="alpine:3.17"
+ARG BUILDIMG="golang:1.20-alpine3.17"
 FROM $BUILDIMG as builder
 
 ARG APP_NAME="rss_checker"
@@ -11,7 +11,7 @@ RUN apk --no-cache add git
 COPY . /go/
 
 RUN cd /go \
-	&& CGO_ENABLED=0 go build -o /${APP_NAME}
+    && CGO_ENABLED=0 go build -o /${APP_NAME}
 
 FROM $BASEIMG
 LABEL maintainer="Nate Catelli <ncatelli@packetfire.org>"
