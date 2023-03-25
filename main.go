@@ -33,15 +33,6 @@ func getEnvOr(key, defaultVal string) string {
 	}
 }
 
-type ErrInvalidFeedResponse struct {
-	feed     string
-	respCode int
-}
-
-func (e *ErrInvalidFeedResponse) Error() string {
-	return fmt.Sprintf("received invalid responce code (%d) from feed", e.respCode)
-}
-
 func loadCachedFeed(feedPath string) (*rss.Feed, error) {
 	cachedFeed := &rss.Feed{}
 
@@ -102,7 +93,7 @@ func main() {
 	for feedName, feedUrl := range feedConfs {
 		req, err := url.Parse(feedUrl.String())
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed to parse feed url with : %s\n", err)
 		}
 
 		var newItems []*rss.Item
@@ -116,7 +107,7 @@ func main() {
 				log.Fatal(err)
 			}
 			for _, item := range feed.Items {
-				if item.Read == false {
+				if !item.Read {
 					newItems = append(newItems, item)
 				}
 			}
@@ -137,13 +128,13 @@ func main() {
 		// setup template
 		outputTemplate, err := template.New("output").Parse(formatOutput)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed to prepare output template with: %s\n", err)
 		}
 
 		for _, item := range newItems {
 			err = outputTemplate.Execute(os.Stdout, item)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatalf("failed to render output template with: %s\n", err)
 			}
 		}
 	}
