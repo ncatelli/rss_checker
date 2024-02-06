@@ -17,3 +17,5 @@ rss_checker
 
 # Ignore cache dirs
 .rss_checker/
+
+/node_modules/
