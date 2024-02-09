@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -67,6 +68,11 @@ func cacheFeed(cachePath string, feed *rss.Feed) error {
 	return nil
 }
 
+func fetchFeed(url string) (resp *http.Response, err error) {
+	client := http.DefaultClient
+	return client.Get(url)
+}
+
 func printHelp() {
 	fmt.Println("Usage: rss_checker [OPTIONS]...")
 	fmt.Printf("A cli RSS feed checker.\n\n")
@@ -112,7 +118,8 @@ func main() {
 				}
 			}
 		} else {
-			upstream, err := rss.Fetch(req.String())
+			upstream, err := rss.FetchByFunc(fetchFeed, req.String())
+
 			if err != nil {
 				log.Fatalf("invalid upstream url for %s: %s\n", feedName, req.String())
 			}
