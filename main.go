@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/SlyMarbo/rss"
+	"github.com/sourcegraph/conc"
 )
 
 const (
@@ -73,30 +74,8 @@ func fetchFeed(url string) (resp *http.Response, err error) {
 	return client.Get(url)
 }
 
-func printHelp() {
-	fmt.Println("Usage: rss_checker [OPTIONS]...")
-	fmt.Printf("A cli RSS feed checker.\n\n")
-	flag.PrintDefaults()
-}
-
-func main() {
-	help := flag.Bool("help", false, "print help information")
-	flag.StringVar(&confPath, "conf-path", getEnvOr("RSS_CHECKER_CONF_PATH", "conf"), "the directory path to source conf files")
-	flag.StringVar(&cachePath, "cache-path", getEnvOr("RSS_CHECKER_CACHE_PATH", ".rss_checker/cache"), "the directory path to store all cache files")
-	flag.StringVar(&formatOutput, "format", getEnvOr("RSS_CHECKER_OUTPUT_FORMAT", defaultOutputFormatting), "a formatting string for the resulting output data")
-	flag.Parse()
-
-	if *help {
-		printHelp()
-		os.Exit(0)
-	}
-
-	feedConfs, err := WalkAllFilesInConfDir(filepath.Clean(confPath))
-	if err != nil {
-		log.Fatal("failed to fetch feeds")
-	}
-
-	for feedName, feedUrl := range feedConfs {
+func handler(feedName string, feedUrl url.URL) func() {
+	return func() {
 		req, err := url.Parse(feedUrl.String())
 		if err != nil {
 			log.Fatalf("failed to parse feed url with : %s\n", err)
@@ -144,6 +123,37 @@ func main() {
 				log.Fatalf("failed to render output template with: %s\n", err)
 			}
 		}
+	}
+}
+
+func printHelp() {
+	fmt.Println("Usage: rss_checker [OPTIONS]...")
+	fmt.Printf("A cli RSS feed checker.\n\n")
+	flag.PrintDefaults()
+}
+
+func main() {
+	help := flag.Bool("help", false, "print help information")
+	flag.StringVar(&confPath, "conf-path", getEnvOr("RSS_CHECKER_CONF_PATH", "conf"), "the directory path to source conf files")
+	flag.StringVar(&cachePath, "cache-path", getEnvOr("RSS_CHECKER_CACHE_PATH", ".rss_checker/cache"), "the directory path to store all cache files")
+	flag.StringVar(&formatOutput, "format", getEnvOr("RSS_CHECKER_OUTPUT_FORMAT", defaultOutputFormatting), "a formatting string for the resulting output data")
+	flag.Parse()
+
+	if *help {
+		printHelp()
+		os.Exit(0)
+	}
+
+	feedConfs, err := WalkAllFilesInConfDir(filepath.Clean(confPath))
+	if err != nil {
+		log.Fatal("failed to fetch feeds")
+	}
+
+	var wg conc.WaitGroup
+	defer wg.Wait()
+
+	for feedName, feedUrl := range feedConfs {
+		wg.Go(handler(feedName, feedUrl))
 	}
 
 }
