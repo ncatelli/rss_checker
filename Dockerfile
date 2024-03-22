@@ -1,5 +1,5 @@
 ARG BASEIMG="alpine:3.17"
-ARG BUILDIMG="golang:1.20-alpine3.17"
+ARG BUILDIMG="golang:1.22-alpine3.17"
 FROM $BUILDIMG as builder
 
 ARG APP_NAME="rss_checker"
