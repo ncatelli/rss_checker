@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultOutputFormatting string = "{{ .Link }}\n"
+	defaultOutputFormatting string = "{{ generateFullURL item.Link }}\n"
 )
 
 var (
@@ -74,12 +74,39 @@ func fetchFeed(url string) (resp *http.Response, err error) {
 	return client.Get(url)
 }
 
+func generateFullyQualifiedDomainGenerator(feedUrl url.URL) func(string) url.URL {
+	return func(maybePath string) url.URL {
+		feedUrl := feedUrl
+		feedItem, err := url.Parse(maybePath)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		if feedItem.Host == "" || feedItem.Scheme == "" {
+			mergedUrl := url.URL{
+				Scheme:      feedUrl.Scheme,
+				Opaque:      feedUrl.Opaque,
+				User:        feedUrl.User,
+				Host:        feedUrl.Host,
+				Path:        feedItem.Path,
+				RawPath:     feedItem.RawPath,
+				OmitHost:    false,
+				ForceQuery:  false,
+				RawQuery:    feedItem.RawQuery,
+				Fragment:    feedItem.Fragment,
+				RawFragment: feedItem.RawFragment,
+			}
+
+			return mergedUrl
+		}
+
+		return *feedItem
+	}
+}
+
 func handler(feedName string, feedUrl url.URL) func() {
 	return func() {
-		req, err := url.Parse(feedUrl.String())
-		if err != nil {
-			log.Fatalf("failed to parse feed url with : %s\n", err)
-		}
+		req := feedUrl
 
 		var newItems []*rss.Item
 
@@ -112,7 +139,9 @@ func handler(feedName string, feedUrl url.URL) func() {
 		}
 
 		// setup template
-		outputTemplate, err := template.New("output").Parse(formatOutput)
+		outputTemplate, err := template.New("output").Funcs(template.FuncMap{
+			"generateFullURL": generateFullyQualifiedDomainGenerator(feedUrl),
+		}).Parse(formatOutput)
 		if err != nil {
 			log.Fatalf("failed to prepare output template with: %s\n", err)
 		}
