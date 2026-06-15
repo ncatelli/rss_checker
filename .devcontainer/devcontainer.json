@@ -2,6 +2,6 @@
 	"name": "Go",
 	"image": "mcr.microsoft.com/devcontainers/go:1-1.22-bullseye",
 	"features": {
-		"ghcr.io/devcontainers/features/node:1": {}
+		"ghcr.io/devcontainers/features/node:2": {}
 	}
 }
